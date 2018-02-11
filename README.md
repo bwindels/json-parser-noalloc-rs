@@ -1,0 +1,1 @@
+Library for parsing JSON conforming to [RFC 7159](https://tools.ietf.org/html/rfc7159) in Rust without allocating any dynamic memory.
