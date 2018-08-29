@@ -15,10 +15,13 @@ const CARRIAGE_RETURN       : u8 = 0x0D;
 const DIGIT_ZERO            : u8 = 0x30;
 const DIGIT_NINE            : u8 = 0x39;
 const BACKSLASH             : u8 = 0x5C;
+const LOWERCASE_E           : u8 = 0x65; 
+const UPPERCASE_E           : u8 = 0x45;
+const PLUS                  : u8 = 0x2B;
+const MINUS                 : u8 = 0x2D;
 const TRUE       : &'static [u8] = b"true";
 const FALSE      : &'static [u8] = b"false";
 const NULL       : &'static [u8] = b"null";
-
 #[derive(Debug, PartialEq)]
 pub enum Error {
   UnterminatedString
@@ -67,7 +70,12 @@ fn find_string_literal(data: &[u8]) -> TokenizeResult<Option<usize>> {
 }
 
 fn find_number_literal(data: &[u8]) -> Option<usize> {
-  let end = data.iter().position(|b| !is_ascii_digit(*b) && *b != PERIOD).unwrap_or(data.len());
+  let end = data.iter().position(|b| {
+    !is_ascii_digit(*b) && match *b {
+      PERIOD | LOWERCASE_E | UPPERCASE_E | PLUS | MINUS => false,
+      _ => true
+    }
+  }).unwrap_or(data.len());
   if end != 0 {
     Some(end)
   }
@@ -244,6 +252,17 @@ mod tests {
     copy_str(&mut expected_string, &json);
     let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
     assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
+  }
+
+  #[test]
+  fn test_number_exponential() {
+    let mut json = [0u8; 11];
+    copy_str(&mut json, b"-35.122E+45");
+    let mut expected_string = [0u8; 11];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Number(&mut expected_string))));
     assert_eq!(tokenizer.next(), Ok(None));
   }
 
