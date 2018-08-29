@@ -51,10 +51,7 @@ pub enum Token<'a> {
 }
 
 fn is_ascii_digit(chr: u8) -> bool {
-  match chr {
-    DIGIT_ZERO ... DIGIT_NINE => true,
-    _ => false
-  }
+  chr >= DIGIT_ZERO && chr <= DIGIT_NINE
 }
 
 fn is_ascii_whitespace(chr: u8) -> bool {
@@ -170,8 +167,8 @@ mod tests {
 
   #[test]
   fn test_basic_object() {
-    let mut json = [0u8; 26];
-    copy_str(&mut json, b"{\"foo\":   [3.14, \"baaar\"]}");
+    let mut json = [0u8; 29];
+    copy_str(&mut json, b"{\"foo\":   [3.14909, \"baaar\"]}");
     let mut foo = [0u8; 5];
     copy_str(&mut foo, b"\"foo\"");
     let mut baaar = [0u8; 7];
@@ -184,7 +181,7 @@ mod tests {
     assert_eq!(tokenizer.next(), Some(Token::Colon));
     assert_eq!(tokenizer.next(), Some(Token::Whitespace));
     assert_eq!(tokenizer.next(), Some(Token::BeginArray));
-    assert_eq!(tokenizer.next(), Some(Token::Number(b"3.14")));
+    assert_eq!(tokenizer.next(), Some(Token::Number(b"3.14909")));
     assert_eq!(tokenizer.next(), Some(Token::Comma));
     assert_eq!(tokenizer.next(), Some(Token::Whitespace));
     assert_eq!(tokenizer.next(), Some(Token::String(&mut baaar)));
