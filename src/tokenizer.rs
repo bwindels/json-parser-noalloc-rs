@@ -12,6 +12,7 @@ const LINE_FEED             : u8 = 0x0A;
 const CARRIAGE_RETURN       : u8 = 0x0D;
 const DIGIT_ZERO            : u8 = 0x30;
 const DIGIT_NINE            : u8 = 0x39;
+const BACKSLASH             : u8 = 0x5C;
 const TRUE       : &'static [u8] = b"true";
 const FALSE      : &'static [u8] = b"false";
 const NULL       : &'static [u8] = b"null";
@@ -65,9 +66,12 @@ fn find_string_literal(data: &[u8]) -> Option<usize> {
   if data[0] != DOUBLE_QUOTE {
     return None;
   }
-  //check \" by iterating over iter().windows(2)
-  let end = data[1..].iter().position(|b| *b == DOUBLE_QUOTE).unwrap_or(data.len());
-  Some(end + 1 + 1)
+  let end = data
+    .windows(2)
+    .position(|window| {
+      window[1] == DOUBLE_QUOTE && window[0] != BACKSLASH
+    }).unwrap_or(data.len());
+  Some(end + 2)
 }
 
 fn find_number_literal(data: &[u8]) -> Option<usize> {
@@ -187,6 +191,28 @@ mod tests {
     assert_eq!(tokenizer.next(), Some(Token::String(&mut baaar)));
     assert_eq!(tokenizer.next(), Some(Token::EndArray));
     assert_eq!(tokenizer.next(), Some(Token::EndObject));
+    assert_eq!(tokenizer.next(), None);
+  }
+
+  #[test]
+  fn test_string_empty() {
+    let mut json = [0u8; 2];
+    copy_str(&mut json, b"\"\"");
+    let mut expected_string = [0u8; 2];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Some(Token::String(&mut expected_string)));
+    assert_eq!(tokenizer.next(), None);
+  }
+
+  #[test]
+  fn test_string_with_escaped_quotation_mark() {
+    let mut json = [0u8; 4];
+    copy_str(&mut json, b"\"\\\"\"");
+    let mut expected_string = [0u8; 4];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Some(Token::String(&mut expected_string)));
     assert_eq!(tokenizer.next(), None);
   }
 
