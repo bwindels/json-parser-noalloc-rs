@@ -215,6 +215,39 @@ mod tests {
   }
 
   #[test]
+  fn test_string_with_unicode() {
+    let mut json = [0u8; 14];
+    copy_str(&mut json, "\"😬👍🤯\"".as_bytes());
+    let mut expected_string = [0u8; 14];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
+  }
+
+  #[test]
+  fn test_string_with_newline() {
+    let mut json = [0u8; 3];
+    copy_str(&mut json, b"\"\n\"");
+    let mut expected_string = [0u8; 3];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
+  }
+
+  #[test]
+  fn test_string_with_escaped_unicode() {
+    let mut json = [0u8; 8];
+    copy_str(&mut json, b"\"\\uaabb\"");
+    let mut expected_string = [0u8; 8];
+    copy_str(&mut expected_string, &json);
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
+  }
+
+  #[test]
   fn test_string_unterminated() {
     let mut json = [0u8; 6];
     copy_str(&mut json, b"\"hello");
