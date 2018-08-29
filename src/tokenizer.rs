@@ -166,27 +166,39 @@ impl<'a> Iterator for Tokenizer<'a> {
 #[cfg(test)]
 mod tests {
   use super::{Tokenizer, Token};
+  use self::helpers::copy_str;
 
   #[test]
-  fn it_works() {
-    let data = b"{\"foo\":   [3.14, \"baaar\"]}";
-    let mut mut_data = [0u8; 26];
-    assert_eq!(data.len(), mut_data.len());
-    for i in 0..data.len() {
-      mut_data[i] = data[i];
-    }
-    let mut tokenizer = Tokenizer {data: Some(mut_data.as_mut())};
+  fn test_basic_object() {
+    let mut json = [0u8; 26];
+    copy_str(&mut json, b"{\"foo\":   [3.14, \"baaar\"]}");
+    let mut foo = [0u8; 5];
+    copy_str(&mut foo, b"\"foo\"");
+    let mut baaar = [0u8; 7];
+    copy_str(&mut baaar, b"\"baaar\"");
+    
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
 
     assert_eq!(tokenizer.next(), Some(Token::BeginObject));
-    let token = tokenizer.next();
+    assert_eq!(tokenizer.next(), Some(Token::String(&mut foo)));
+    assert_eq!(tokenizer.next(), Some(Token::Colon));
+    assert_eq!(tokenizer.next(), Some(Token::Whitespace));
+    assert_eq!(tokenizer.next(), Some(Token::BeginArray));
+    assert_eq!(tokenizer.next(), Some(Token::Number(b"3.14")));
+    assert_eq!(tokenizer.next(), Some(Token::Comma));
+    assert_eq!(tokenizer.next(), Some(Token::Whitespace));
+    assert_eq!(tokenizer.next(), Some(Token::String(&mut baaar)));
+    assert_eq!(tokenizer.next(), Some(Token::EndArray));
+    assert_eq!(tokenizer.next(), Some(Token::EndObject));
+    assert_eq!(tokenizer.next(), None);
+  }
 
-    //assert_eq!(tokenizer.next(), Some(Token::String(b"\"foo\"")));
-    while let Some(token) = tokenizer.next() {
-      println!("token: {:?}", token);
+  mod helpers {
+    pub fn copy_str(mut_data: &mut [u8], data: &[u8]) {
+      assert_eq!(data.len(), mut_data.len());
+      for i in 0..data.len() {
+        mut_data[i] = data[i];
+      }
     }
   }
-  /*
-  mod helpers {
-    fn is_string_token<'a>(token: Token<'a>, )
-  }*/
 }
