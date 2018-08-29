@@ -1,3 +1,5 @@
+use fallible_iterator::FallibleIterator;
+
 const DOUBLE_QUOTE          : u8 = 0x22;
 const COLON                 : u8 = 0x3A;
 const COMMA                 : u8 = 0x2C;
@@ -17,23 +19,12 @@ const TRUE       : &'static [u8] = b"true";
 const FALSE      : &'static [u8] = b"false";
 const NULL       : &'static [u8] = b"null";
 
-pub struct Position {
-  offset: usize
+#[derive(Debug, PartialEq)]
+pub enum Error {
+  UnterminatedString
 }
 
-pub enum ErrorKind {
-  UnexpectedSequence,
-  OpenString
-}
-
-pub struct Error {
-  position: Position,
-  kind: ErrorKind
-}
-
-pub struct Tokenizer<'a> {
-  data: Option<&'a mut [u8]>
-}
+pub type TokenizeResult<T> = Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Token<'a> {
@@ -62,16 +53,17 @@ fn is_ascii_whitespace(chr: u8) -> bool {
   }
 }
 
-fn find_string_literal(data: &[u8]) -> Option<usize> {
+fn find_string_literal(data: &[u8]) -> TokenizeResult<Option<usize>> {
   if data[0] != DOUBLE_QUOTE {
-    return None;
+    return Ok(None);
   }
   let end = data
     .windows(2)
     .position(|window| {
       window[1] == DOUBLE_QUOTE && window[0] != BACKSLASH
-    }).unwrap_or(data.len());
-  Some(end + 2)
+    });
+  let len = end.map(|n| Some(n + 2));
+  len.ok_or(Error::UnterminatedString)
 }
 
 fn find_number_literal(data: &[u8]) -> Option<usize> {
@@ -105,7 +97,7 @@ fn split(data: &mut [u8], index: usize) -> (&mut [u8], Option<&mut [u8]>) {
   return (token, remaining);
 }
 
-fn split_next_token<'a>(data: &'a mut [u8]) -> (Option<Token<'a>>, Option<&'a mut [u8]>) {
+fn split_next_token<'a>(data: &'a mut [u8]) -> TokenizeResult<(Option<Token<'a>>, Option<&'a mut [u8]>)> {
   let simple_token = match data[0] {
     LEFT_CURLY_BRACKET => Some(Token::BeginObject),
     RIGHT_CURLY_BRACKET => Some(Token::EndObject),
@@ -118,55 +110,61 @@ fn split_next_token<'a>(data: &'a mut [u8]) -> (Option<Token<'a>>, Option<&'a mu
 
   if let Some(token) = simple_token {
     let (_, remaining) = split(data, 1);
-    return (Some(token), remaining);
+    return Ok( (Some(token), remaining) );
   }
 
   if data.starts_with(TRUE) {
     let (_, remaining) = split(data, TRUE.len());
-    return (Some(Token::True), remaining);
+    return Ok( (Some(Token::True), remaining) );
   }
   if data.starts_with(FALSE) {
     let (_, remaining) = split(data, FALSE.len());
-    return (Some(Token::False), remaining);
+    return Ok( (Some(Token::False), remaining) );
   }
   if data.starts_with(NULL) {
     let (_, remaining) = split(data, NULL.len());
-    return (Some(Token::Null), remaining);
+    return Ok( (Some(Token::Null), remaining) );
   }
 
   if let Some(len) = find_whitespace(data) {
     let (_, remaining) = split(data, len);
-    return (Some(Token::Whitespace), remaining);
+    return Ok( (Some(Token::Whitespace), remaining) );
   }
-  if let Some(len) = find_string_literal(data) {
+  if let Some(len) = find_string_literal(data)? {
     let (string_literal, remaining) = split(data, len);
-    return (Some(Token::String(string_literal)), remaining);
+    return Ok( (Some(Token::String(string_literal)), remaining) );
   }
   if let Some(len) = find_number_literal(data) {
     let (number_literal, remaining) = split(data, len);
-    return (Some(Token::Number(number_literal)), remaining);
+    return Ok( (Some(Token::Number(number_literal)), remaining) );
   }
 
-  return (None, Some(data));
+  return Ok( (None, Some(data)) );
 }
 
-impl<'a> Iterator for Tokenizer<'a> {
-  type Item = Token<'a>;
+pub struct Tokenizer<'a> {
+  data: Option<&'a mut [u8]>
+}
 
-  fn next(&mut self) -> Option<Self::Item> {
+impl<'a> FallibleIterator for Tokenizer<'a> {
+  type Item = Token<'a>;
+  type Error = Error;
+
+  fn next(&mut self) -> TokenizeResult<Option<Self::Item>> {
     let data_option = self.data.take();
     let (token, remaining_data) = data_option
       .map(split_next_token)
-      .unwrap_or((None, None));
+      .unwrap_or(Ok( (None, None) ))?;
     self.data = remaining_data;
-    token
+    Ok(token)
   }
 }
 
 
 #[cfg(test)]
 mod tests {
-  use super::{Tokenizer, Token};
+  use fallible_iterator::FallibleIterator;
+  use super::{Tokenizer, Token, Error};
   use self::helpers::copy_str;
 
   #[test]
@@ -180,18 +178,18 @@ mod tests {
     
     let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
 
-    assert_eq!(tokenizer.next(), Some(Token::BeginObject));
-    assert_eq!(tokenizer.next(), Some(Token::String(&mut foo)));
-    assert_eq!(tokenizer.next(), Some(Token::Colon));
-    assert_eq!(tokenizer.next(), Some(Token::Whitespace));
-    assert_eq!(tokenizer.next(), Some(Token::BeginArray));
-    assert_eq!(tokenizer.next(), Some(Token::Number(b"3.14909")));
-    assert_eq!(tokenizer.next(), Some(Token::Comma));
-    assert_eq!(tokenizer.next(), Some(Token::Whitespace));
-    assert_eq!(tokenizer.next(), Some(Token::String(&mut baaar)));
-    assert_eq!(tokenizer.next(), Some(Token::EndArray));
-    assert_eq!(tokenizer.next(), Some(Token::EndObject));
-    assert_eq!(tokenizer.next(), None);
+    assert_eq!(tokenizer.next(), Ok(Some(Token::BeginObject)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut foo))));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Colon)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Whitespace)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::BeginArray)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Number(b"3.14909"))));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Comma)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Whitespace)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut baaar))));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::EndArray)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::EndObject)));
+    assert_eq!(tokenizer.next(), Ok(None));
   }
 
   #[test]
@@ -201,8 +199,8 @@ mod tests {
     let mut expected_string = [0u8; 2];
     copy_str(&mut expected_string, &json);
     let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
-    assert_eq!(tokenizer.next(), Some(Token::String(&mut expected_string)));
-    assert_eq!(tokenizer.next(), None);
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
   }
 
   #[test]
@@ -212,8 +210,16 @@ mod tests {
     let mut expected_string = [0u8; 4];
     copy_str(&mut expected_string, &json);
     let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
-    assert_eq!(tokenizer.next(), Some(Token::String(&mut expected_string)));
-    assert_eq!(tokenizer.next(), None);
+    assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut expected_string))));
+    assert_eq!(tokenizer.next(), Ok(None));
+  }
+
+  #[test]
+  fn test_string_unterminated() {
+    let mut json = [0u8; 6];
+    copy_str(&mut json, b"\"hello");
+    let mut tokenizer = Tokenizer {data: Some(json.as_mut())};
+    assert_eq!(tokenizer.next(), Err(Error::UnterminatedString));
   }
 
   mod helpers {
