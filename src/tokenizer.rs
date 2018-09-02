@@ -1,27 +1,8 @@
 use fallible_iterator::FallibleIterator;
+use super::constants::*;
+use super::number::is_ascii_digit;
+use super::split::split_mut;
 
-const DOUBLE_QUOTE          : u8 = 0x22;
-const COLON                 : u8 = 0x3A;
-const COMMA                 : u8 = 0x2C;
-const PERIOD                : u8 = 0x2E;
-const LEFT_CURLY_BRACKET    : u8 = 0x7B;
-const RIGHT_CURLY_BRACKET   : u8 = 0x7D;
-const LEFT_SQUARE_BRACKET   : u8 = 0x5B;
-const RIGHT_SQUARE_BRACKET  : u8 = 0x5D;
-const SPACE                 : u8 = 0x20;
-const TAB                   : u8 = 0x09;
-const LINE_FEED             : u8 = 0x0A;
-const CARRIAGE_RETURN       : u8 = 0x0D;
-const DIGIT_ZERO            : u8 = 0x30;
-const DIGIT_NINE            : u8 = 0x39;
-const BACKSLASH             : u8 = 0x5C;
-const LOWERCASE_E           : u8 = 0x65; 
-const UPPERCASE_E           : u8 = 0x45;
-const PLUS                  : u8 = 0x2B;
-const MINUS                 : u8 = 0x2D;
-const TRUE       : &'static [u8] = b"true";
-const FALSE      : &'static [u8] = b"false";
-const NULL       : &'static [u8] = b"null";
 #[derive(Debug, PartialEq)]
 pub enum Error {
   UnterminatedString
@@ -43,10 +24,6 @@ pub enum Token<'a> {
   False,
   Null,
   Whitespace
-}
-
-fn is_ascii_digit(chr: u8) -> bool {
-  chr >= DIGIT_ZERO && chr <= DIGIT_NINE
 }
 
 fn is_ascii_whitespace(chr: u8) -> bool {
@@ -94,17 +71,6 @@ fn find_whitespace(data: &[u8]) -> Option<usize> {
   }
 }
 
-fn split(data: &mut [u8], index: usize) -> (&mut [u8], Option<&mut [u8]>) {
-  let (token, remaining) = data.split_at_mut(index);
-  let remaining = if remaining.len() != 0 {
-    Some(remaining)
-  }
-  else {
-    None
-  };
-  return (token, remaining);
-}
-
 fn split_next_token<'a>(data: &'a mut [u8]) -> TokenizeResult<(Option<Token<'a>>, Option<&'a mut [u8]>)> {
   let simple_token = match data[0] {
     LEFT_CURLY_BRACKET => Some(Token::BeginObject),
@@ -117,33 +83,33 @@ fn split_next_token<'a>(data: &'a mut [u8]) -> TokenizeResult<(Option<Token<'a>>
   };
 
   if let Some(token) = simple_token {
-    let (_, remaining) = split(data, 1);
+    let (_, remaining) = split_mut(data, 1);
     return Ok( (Some(token), remaining) );
   }
 
   if data.starts_with(TRUE) {
-    let (_, remaining) = split(data, TRUE.len());
+    let (_, remaining) = split_mut(data, TRUE.len());
     return Ok( (Some(Token::True), remaining) );
   }
   if data.starts_with(FALSE) {
-    let (_, remaining) = split(data, FALSE.len());
+    let (_, remaining) = split_mut(data, FALSE.len());
     return Ok( (Some(Token::False), remaining) );
   }
   if data.starts_with(NULL) {
-    let (_, remaining) = split(data, NULL.len());
+    let (_, remaining) = split_mut(data, NULL.len());
     return Ok( (Some(Token::Null), remaining) );
   }
 
   if let Some(len) = find_whitespace(data) {
-    let (_, remaining) = split(data, len);
+    let (_, remaining) = split_mut(data, len);
     return Ok( (Some(Token::Whitespace), remaining) );
   }
   if let Some(len) = find_string_literal(data)? {
-    let (string_literal, remaining) = split(data, len);
+    let (string_literal, remaining) = split_mut(data, len);
     return Ok( (Some(Token::String(string_literal)), remaining) );
   }
   if let Some(len) = find_number_literal(data) {
-    let (number_literal, remaining) = split(data, len);
+    let (number_literal, remaining) = split_mut(data, len);
     return Ok( (Some(Token::Number(number_literal)), remaining) );
   }
 
