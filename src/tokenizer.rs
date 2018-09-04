@@ -146,8 +146,8 @@ mod tests {
 
   #[test]
   fn test_basic_object() {
-    let mut json = [0u8; 29];
-    copy_str(&mut json, b"{\"foo\":   [3.14909, \"baaar\"]}");
+    let mut json = [0u8; 41];
+    copy_str(&mut json, b"{\"foo\":   [3.14909, \"baaar\", null,false]}");
     let mut foo = [0u8; 5];
     copy_str(&mut foo, b"\"foo\"");
     let mut baaar = [0u8; 7];
@@ -164,6 +164,11 @@ mod tests {
     assert_eq!(tokenizer.next(), Ok(Some(Token::Comma)));
     assert_eq!(tokenizer.next(), Ok(Some(Token::Whitespace)));
     assert_eq!(tokenizer.next(), Ok(Some(Token::String(&mut baaar))));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Comma)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Whitespace)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Null)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::Comma)));
+    assert_eq!(tokenizer.next(), Ok(Some(Token::False)));
     assert_eq!(tokenizer.next(), Ok(Some(Token::EndArray)));
     assert_eq!(tokenizer.next(), Ok(Some(Token::EndObject)));
     assert_eq!(tokenizer.next(), Ok(None));
