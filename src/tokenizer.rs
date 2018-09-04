@@ -1,6 +1,5 @@
 use fallible_iterator::FallibleIterator;
 use super::constants::*;
-use super::number::is_ascii_digit;
 use super::split::split_mut;
 
 #[derive(Debug, PartialEq)]
@@ -24,6 +23,10 @@ pub enum Token<'a> {
   False,
   Null,
   Whitespace
+}
+
+fn is_ascii_digit(chr: u8) -> bool {
+  chr >= DIGIT_ZERO && chr <= DIGIT_NINE
 }
 
 fn is_ascii_whitespace(chr: u8) -> bool {

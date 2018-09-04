@@ -15,15 +15,6 @@ pub enum Error {
 	InvalidFloat
 }
 
-pub fn is_ascii_digit(chr: u8) -> bool {
-  chr >= DIGIT_ZERO && chr <= DIGIT_NINE
-}
-
-fn is_nonzero_ascii_digit(chr: u8) -> bool {
-  chr > DIGIT_ZERO && chr <= DIGIT_NINE
-}
-
-
 pub fn parse_number(token: &[u8]) -> Result<Number, Error> {
 	let mut has_exponent = false;
 	let mut has_period = false;
@@ -79,5 +70,4 @@ mod tests {
 		assert_eq!(parse_number(b"3141592e-6"), Ok(Number::Float(3.141592)));
 		assert_eq!(parse_number(b"-1.a"), Err(Error::InvalidFloat));
 	}
-	
 }
